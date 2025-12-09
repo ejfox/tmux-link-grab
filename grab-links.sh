@@ -1,7 +1,7 @@
 #!/bin/bash
 
-# tmux-link-grab - elegant URL/IP/file path seeking for tmux
-# Hit prefix+s, numbers appear on URLs/IPs/paths, type number, get highlighted flash of confirmation
+# tmux-link-grab - elegant URL/IP seeking for tmux
+# Hit prefix+s, numbers appear on URLs/IPs, type number, get highlighted flash of confirmation
 # License: GNU GPL v3
 
 set -euo pipefail
@@ -64,23 +64,19 @@ main() {
     tmux display-message "tmux-link-grab: Missing dependencies" 2>/dev/null || exit 1
   fi
 
-  # Extract URLs, IPs, and file paths from ALL PANES in current window
+  # Extract URLs and IPs from ALL PANES in current window
   # Pattern matches:
   #   - https://example.com
   #   - http://example.com
   #   - ftp://example.com
   #   - 192.168.1.1
-  #   - /absolute/paths/to/files
-  #   - ~/home/paths
-  #   - ./relative/paths
-  #   - ../parent/paths
   local items
   items=$(tmux capture-pane -p -S "-${SCROLLBACK_LINES}" -t "$window" 2>/dev/null | \
-    grep -oE '(https?|ftp)://[^ ]+|([0-9]{1,3}\.){3}[0-9]{1,3}|(/[a-zA-Z0-9._/-]*)+|~(/[a-zA-Z0-9._-]*)+|(\.\./)+[a-zA-Z0-9._/-]*|(\./)[a-zA-Z0-9._/-]*' | \
+    grep -oE '(https?|ftp)://[^ ]+|([0-9]{1,3}\.){3}[0-9]{1,3}' | \
     sort -u)
 
   if [ -z "$items" ]; then
-    tmux display-message "tmux-link-grab: No URLs, IPs, or paths found" 2>/dev/null || true
+    tmux display-message "tmux-link-grab: No URLs or IPs found" 2>/dev/null || true
     return 1
   fi
 
