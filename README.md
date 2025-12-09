@@ -1,13 +1,13 @@
 # tmux-link-grab
 
-Elegant seek-mode for URLs and IPs in tmux. Hit `prefix + s`, numbered list appears, type the number, it flashes confirmation and copies to clipboard.
+Elegant seek-mode for URLs and IPs in tmux. Hit `prefix + s`, numbered list appears, type the number, it copies to clipboard.
 
 ## Features
 
 - **Zero friction**: One keybinding to access all URLs and IPs
 - **Smart extraction**: Finds `https://`, `http://`, `ftp://` URLs and IPv4 addresses
 - **Fast selection**: Number-based picking (like vim's `s` or neovim's `leap.nvim`)
-- **Visual feedback**: Status bar flashes on successful copy
+- **Refined feedback**: Clean message confirmation
 - **Cross-platform**: Works on macOS (pbcopy), Linux (xclip/wl-copy)
 - **Bulletproof**: Full error handling, dependency checks, graceful degradation
 - **Window-wide**: Searches entire window (all panes at once)
@@ -44,8 +44,7 @@ Reload: `tmux source-file ~/.tmux.conf`
 1. Press `prefix + s` (or whatever key you bind)
 2. Numbered list of URLs and IPs appear in fzf
 3. Type the number to select (or arrow keys + enter)
-4. **Flash** — status bar blinks confirmation
-5. URL copied to clipboard, back to normal
+4. Message confirms: `✓ Copied: [URL]`
 
 ### Keyboard shortcuts in fzf menu
 
@@ -60,8 +59,6 @@ Edit the top of `grab-links.sh` to customize:
 
 ```bash
 SCROLLBACK_LINES=100    # Lines to search back through
-FLASH_COUNT=2           # Number of flashes on copy
-FLASH_DURATION=0.1      # Duration of each flash (seconds)
 ```
 
 ## Supported Patterns

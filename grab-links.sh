@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # tmux-link-grab - elegant URL/IP seeking for tmux
-# Hit prefix+s, numbers appear on URLs/IPs, type number, get highlighted flash of confirmation
+# Hit prefix+s, numbers appear on URLs/IPs, type number, copy it
 # License: GNU GPL v3
 
 set -euo pipefail
@@ -11,8 +11,6 @@ set -euo pipefail
 # ============================================================================
 
 SCROLLBACK_LINES=100
-FLASH_COUNT=2
-FLASH_DURATION=0.1
 
 # Detect clipboard command based on OS
 detect_clipboard() {
@@ -98,30 +96,12 @@ main() {
 
   # Copy to clipboard using detected method
   if echo -n "$item" | $CLIPBOARD 2>/dev/null; then
-    # Flash status bar for visual confirmation
-    flash_confirmation "$window"
-    tmux display-message "Copied: $item" 2>/dev/null || true
+    tmux display-message "✓ Copied: $item"
     return 0
   else
-    tmux display-message "tmux-link-grab: Failed to copy to clipboard" 2>/dev/null || true
+    tmux display-message "✗ Failed to copy to clipboard" 2>/dev/null || true
     return 1
   fi
-}
-
-# ============================================================================
-# VISUAL FEEDBACK
-# ============================================================================
-
-flash_confirmation() {
-  local window="$1"
-  local i
-
-  for ((i=0; i < FLASH_COUNT; i++)); do
-    tmux set-option -t "$window" status-style "bg=#ff0055,fg=#ffffff" 2>/dev/null || true
-    sleep "$FLASH_DURATION"
-    tmux set-option -t "$window" status-style "default" 2>/dev/null || true
-    sleep "$FLASH_DURATION"
-  done
 }
 
 # ============================================================================
