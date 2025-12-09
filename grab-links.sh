@@ -70,12 +70,13 @@ main() {
   #   - http://example.com
   #   - ftp://example.com
   #   - 192.168.1.1
-  #   - /absolute/paths
+  #   - /absolute/paths/to/files
   #   - ~/home/paths
   #   - ./relative/paths
+  #   - ../parent/paths
   local items
   items=$(tmux capture-pane -p -S "-${SCROLLBACK_LINES}" -t "$window" 2>/dev/null | \
-    grep -oE '(https?|ftp)://[^ ]+|([0-9]{1,3}\.){3}[0-9]{1,3}|~?/?[./]?[a-zA-Z0-9._/-]+' | \
+    grep -oE '(https?|ftp)://[^ ]+|([0-9]{1,3}\.){3}[0-9]{1,3}|(/[a-zA-Z0-9._/-]*)+|~(/[a-zA-Z0-9._-]*)+|(\.\./)+[a-zA-Z0-9._/-]*|(\./)[a-zA-Z0-9._/-]*' | \
     sort -u)
 
   if [ -z "$items" ]; then
