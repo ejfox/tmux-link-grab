@@ -1,15 +1,17 @@
 # tmux-link-grab
 
-Elegant seek-mode for URLs and IPs in tmux. Hit `prefix + s`, numbers light up on every URL/IP in your scrollback, type the number, it flashes confirmation and copies to clipboard.
+Elegant seek-mode for URLs, IPs, and file paths in tmux. Hit `prefix + s`, numbered list of everything appears, type the number, it flashes confirmation and copies to clipboard.
 
 ## Features
 
-- **Zero friction**: One keybinding to access all URLs and IPs
-- **Smart extraction**: Finds `https://`, `http://`, `ftp://` URLs and IPv4 addresses
+- **Zero friction**: One keybinding to access all URLs, IPs, and file paths
+- **Smart extraction**: Finds `https://`, `http://`, `ftp://` URLs, IPv4 addresses, and file paths
+- **File path awareness**: Grabs `/absolute/paths`, `~/home/paths`, `./relative/paths`
 - **Fast selection**: Number-based picking (like vim's `s` or neovim's `leap.nvim`)
 - **Visual feedback**: Status bar flashes on successful copy
 - **Cross-platform**: Works on macOS (pbcopy), Linux (xclip/wl-copy)
 - **Bulletproof**: Full error handling, dependency checks, graceful degradation
+- **Window-wide**: Searches entire window (all panes at once)
 - **Scrollback aware**: Searches last 100 lines (configurable)
 - **Idempotent**: Safe to call repeatedly without side effects
 
@@ -33,7 +35,7 @@ git clone https://github.com/ejfox/tmux-link-grab ~/.tmux/plugins/tmux-link-grab
 
 Add to `~/.tmux.conf`:
 ```tmux
-bind-key s run-shell "~/.tmux/plugins/tmux-link-grab/grab-links.sh"
+bind-key s display-popup -E "~/.tmux/plugins/tmux-link-grab/grab-links.sh"
 ```
 
 Reload: `tmux source-file ~/.tmux.conf`
@@ -41,14 +43,14 @@ Reload: `tmux source-file ~/.tmux.conf`
 ## Usage
 
 1. Press `prefix + s` (or whatever key you bind)
-2. Numbered list of URLs and IPs appear in fzf
+2. Numbered list of URLs, IPs, and file paths appear in fzf
 3. Type the number to select (or arrow keys + enter)
 4. **Flash** — status bar blinks confirmation
-5. URL copied to clipboard, back to normal
+5. Item copied to clipboard, back to normal
 
 ### Keyboard shortcuts in fzf menu
 
-- **Enter** - Copy selected URL
+- **Enter** - Copy selected item
 - **Esc** - Cancel (return without copying)
 - **Arrow keys** - Navigate
 - **Type** - Filter/search
@@ -65,17 +67,26 @@ FLASH_DURATION=0.1      # Duration of each flash (seconds)
 
 ## Supported Patterns
 
+**URLs:**
 - `https://example.com/path?query=value#fragment`
 - `http://example.com`
 - `ftp://example.com`
+
+**Network:**
 - `192.168.1.1`
 - `10.0.0.1:8080`
+
+**File Paths:**
+- `/absolute/path/to/file.txt`
+- `~/relative/to/home`
+- `./local/relative/path`
+- `../parent/path`
 
 ## Requirements
 
 - **tmux** (1.9+)
 - **fzf** - for the selection menu
-- **grep** - URL/IP extraction
+- **grep** - URL/IP/path extraction
 - **One of**: `pbcopy` (macOS), `xclip` (Linux X11), or `wl-copy` (Linux Wayland)
 
 Missing dependencies will be caught and reported with a clear error message.
@@ -92,8 +103,8 @@ The plugin includes:
 
 ## Troubleshooting
 
-### "No URLs or IPs found"
-- Make sure there are URLs/IPs in the current pane's scrollback
+### "No URLs, IPs, or paths found"
+- Make sure there are URLs/IPs/paths in the current window's scrollback
 - Try scrolling up to add more history
 
 ### "Missing dependencies"
