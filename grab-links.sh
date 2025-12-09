@@ -2,50 +2,131 @@
 
 # tmux-link-grab - elegant URL/IP seeking for tmux
 # Hit prefix+s, numbers appear on URLs, type number, get highlighted flash of confirmation
+# License: GNU GPL v3
 
-PANE="${1:-.}"
+set -euo pipefail
 
-# Extract URLs and IPs from last 100 lines of scrollback
-URLS=$(tmux capture-pane -p -S -100 -t "$PANE" | \
-  grep -oE 'https?://[^\s]+|ftp://[^\s]+|[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}' | \
-  sort -u)
+# ============================================================================
+# CONFIGURATION
+# ============================================================================
 
-if [ -z "$URLS" ]; then
-  tmux display-message "No URLs or IPs found"
-  exit 1
-fi
+SCROLLBACK_LINES=100
+FLASH_COUNT=2
+FLASH_DURATION=0.1
 
-# Create numbered list with colors
-NUMBERED=$(echo "$URLS" | nl -w1 -s' ' | awk '{print "\033[38;5;196m" $1 "\033[0m " $2}')
+# Detect clipboard command based on OS
+detect_clipboard() {
+  if command -v pbcopy &>/dev/null; then
+    echo "pbcopy"
+  elif command -v xclip &>/dev/null; then
+    echo "xclip -selection clipboard"
+  elif command -v wl-copy &>/dev/null; then
+    echo "wl-copy"
+  else
+    return 1
+  fi
+}
 
-# Show in popup with live preview
-CHOICE=$(echo "$URLS" | nl -w1 -s'. ' | \
-  fzf --ansi \
-    --no-preview \
-    --height 50% \
-    --bind 'enter:accept' \
-    --color 'hl:196' \
-    --preview 'echo "Hit enter to copy"' \
-    --preview-window 'bottom:2' \
-  2>/dev/null)
+# ============================================================================
+# DEPENDENCY CHECKS
+# ============================================================================
 
-if [ -z "$CHOICE" ]; then
-  exit 0
-fi
+check_dependencies() {
+  local missing=()
 
-# Extract URL from choice
-URL=$(echo "$CHOICE" | sed 's/^[0-9]*\. //')
+  for cmd in tmux grep fzf; do
+    if ! command -v "$cmd" &>/dev/null; then
+      missing+=("$cmd")
+    fi
+  done
 
-# Copy to clipboard
-echo -n "$URL" | pbcopy
+  if ! CLIPBOARD=$(detect_clipboard); then
+    missing+=("clipboard tool (pbcopy/xclip/wl-copy)")
+  fi
 
-# Flash confirmation - blink the status bar
-tmux set-option -t "$PANE" status-style "bg=#ff0055,fg=#ffffff" 2>/dev/null
-sleep 0.1
-tmux set-option -t "$PANE" status-style "default" 2>/dev/null
-sleep 0.1
-tmux set-option -t "$PANE" status-style "bg=#ff0055,fg=#ffffff" 2>/dev/null
-sleep 0.1
-tmux set-option -t "$PANE" status-style "default" 2>/dev/null
+  if [ ${#missing[@]} -gt 0 ]; then
+    echo "tmux-link-grab: Missing dependencies: ${missing[*]}" >&2
+    return 1
+  fi
 
-tmux display-message "Copied: $URL"
+  return 0
+}
+
+# ============================================================================
+# MAIN LOGIC
+# ============================================================================
+
+main() {
+  local pane="${1:-.}"
+
+  # Check all dependencies exist
+  if ! check_dependencies; then
+    tmux display-message "tmux-link-grab: Missing dependencies" 2>/dev/null || exit 1
+  fi
+
+  # Extract URLs and IPs from scrollback
+  # Pattern matches:
+  #   - https://example.com
+  #   - http://example.com
+  #   - ftp://example.com
+  #   - 192.168.1.1
+  local urls
+  urls=$(tmux capture-pane -p -S "-${SCROLLBACK_LINES}" -t "$pane" 2>/dev/null | \
+    grep -oE '(https?|ftp)://[^ ]+|([0-9]{1,3}\.){3}[0-9]{1,3}' | \
+    sort -u)
+
+  if [ -z "$urls" ]; then
+    tmux display-message "tmux-link-grab: No URLs or IPs found" 2>/dev/null || true
+    return 1
+  fi
+
+  # Let user pick from numbered list using fzf
+  local choice
+  choice=$(echo "$urls" | nl -w1 -s'. ' | \
+    fzf --no-preview \
+      --height 50% \
+      --bind 'enter:accept' \
+      --bind 'esc:abort' \
+      --color 'hl:196' \
+      2>/dev/null) || return 1
+
+  if [ -z "$choice" ]; then
+    return 0
+  fi
+
+  # Extract the URL by removing leading "N. "
+  local url="${choice#[0-9]*. }"
+
+  # Copy to clipboard using detected method
+  if echo -n "$url" | $CLIPBOARD 2>/dev/null; then
+    # Flash status bar for visual confirmation
+    flash_confirmation "$pane"
+    tmux display-message "Copied: $url" 2>/dev/null || true
+    return 0
+  else
+    tmux display-message "tmux-link-grab: Failed to copy to clipboard" 2>/dev/null || true
+    return 1
+  fi
+}
+
+# ============================================================================
+# VISUAL FEEDBACK
+# ============================================================================
+
+flash_confirmation() {
+  local pane="$1"
+  local i
+
+  for ((i=0; i < FLASH_COUNT; i++)); do
+    tmux set-option -t "$pane" status-style "bg=#ff0055,fg=#ffffff" 2>/dev/null || true
+    sleep "$FLASH_DURATION"
+    tmux set-option -t "$pane" status-style "default" 2>/dev/null || true
+    sleep "$FLASH_DURATION"
+  done
+}
+
+# ============================================================================
+# ENTRY POINT
+# ============================================================================
+
+main "$@"
