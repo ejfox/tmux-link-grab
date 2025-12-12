@@ -63,13 +63,14 @@ main() {
   fi
 
   # Extract URLs and IPs from ALL PANES in current window
+  # -J joins wrapped lines (fixes URLs broken by line-wrap)
   # Pattern matches:
   #   - https://example.com
   #   - http://example.com
   #   - ftp://example.com
   #   - 192.168.1.1
   local items
-  items=$(tmux capture-pane -p -S "-${SCROLLBACK_LINES}" -t "$window" 2>/dev/null | \
+  items=$(tmux capture-pane -p -J -S "-${SCROLLBACK_LINES}" -t "$window" 2>/dev/null | \
     grep -oE '(https?|ftp)://[^ ]+|([0-9]{1,3}\.){3}[0-9]{1,3}' | \
     sort -u)
 
@@ -78,30 +79,53 @@ main() {
     return 1
   fi
 
-  # Let user pick from numbered list using fzf (no redirection to allow TTY)
-  local choice
-  choice=$(echo "$items" | nl -w1 -s'. ' | \
+  # Let user pick from numbered list using fzf
+  # Enter = copy, Space = open in browser
+  local result
+  result=$(echo "$items" | nl -w1 -s'. ' | \
     fzf --no-preview \
       --height 50% \
-      --bind 'enter:accept' \
+      --header '↵ copy │ ␣ open' \
+      --expect 'enter,space' \
       --bind 'esc:abort' \
       --color 'hl:196')
 
-  if [ -z "$choice" ]; then
+  if [ -z "$result" ]; then
     return 0
   fi
+
+  # Parse fzf output: first line is the key pressed, second is the selection
+  local key=$(echo "$result" | head -1)
+  local choice=$(echo "$result" | tail -1)
 
   # Extract the item by removing leading "N. "
   local item="${choice#[0-9]*. }"
 
-  # Copy to clipboard using detected method
-  if echo -n "$item" | $CLIPBOARD 2>/dev/null; then
-    tmux display-message "✓ Copied: $item"
+  if [ -z "$item" ]; then
     return 0
-  else
-    tmux display-message "✗ Failed to copy to clipboard" 2>/dev/null || true
-    return 1
   fi
+
+  case "$key" in
+    space)
+      # Open in browser
+      if [[ "$item" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+        open "http://$item" 2>/dev/null || xdg-open "http://$item" 2>/dev/null
+        tmux display-message "◆ Opening: http://$item"
+      else
+        open "$item" 2>/dev/null || xdg-open "$item" 2>/dev/null
+        tmux display-message "◆ Opening: $item"
+      fi
+      ;;
+    *)
+      # Default (enter): copy to clipboard
+      if echo -n "$item" | $CLIPBOARD 2>/dev/null; then
+        tmux display-message "✓ Copied: $item"
+      else
+        tmux display-message "✗ Failed to copy" 2>/dev/null || true
+        return 1
+      fi
+      ;;
+  esac
 }
 
 # ============================================================================
