@@ -70,9 +70,11 @@ main() {
   #   - ftp://example.com
   #   - 192.168.1.1
   local items
+  # Extract URLs/IPs, dedupe while preserving order, newest first (so Enter = most recent)
   items=$(tmux capture-pane -p -J -S "-${SCROLLBACK_LINES}" -t "$window" 2>/dev/null | \
     grep -oE '(https?|ftp)://[^ ]+|([0-9]{1,3}\.){3}[0-9]{1,3}' | \
-    sort -u)
+    awk '!seen[$0]++' | \
+    tac)
 
   if [ -z "$items" ]; then
     tmux display-message "tmux-link-grab: No URLs or IPs found" 2>/dev/null || true
