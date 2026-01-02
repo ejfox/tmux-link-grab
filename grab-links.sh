@@ -1,56 +1,34 @@
 #!/bin/bash
-# tmux-link-grab - fast URL/IP seeking for tmux
-# prefix+s → fzf → Enter=copy, Space=open
+# tmux-link-grab - instant URL seeking
 # License: GNU GPL v3
 
-set -uo pipefail
+# Reduced scrollback = faster capture
+N=${TMUX_LINK_GRAB_LINES:-50}
 
-LINES=${TMUX_LINK_GRAB_LINES:-200}
-
-# Clipboard detection
-clip() {
-  command -v pbcopy &>/dev/null && echo "pbcopy" && return
-  command -v xclip &>/dev/null && echo "xclip -selection clipboard" && return
-  command -v wl-copy &>/dev/null && echo "wl-copy" && return
-  return 1
+# Cache clipboard on first run
+[[ -z "${CLIP:-}" ]] && {
+  command -v pbcopy &>/dev/null && CLIP=pbcopy
+  command -v xclip &>/dev/null && CLIP="xclip -sel clip"
+  command -v wl-copy &>/dev/null && CLIP=wl-copy
 }
+[[ -z "${CLIP:-}" ]] && exit 1
 
-main() {
-  CLIPBOARD=$(clip) || { tmux display-message "No clipboard tool"; exit 1; }
-  command -v fzf &>/dev/null || { tmux display-message "fzf required"; exit 1; }
+# Single pipeline: capture → extract → dedupe → fzf (with --tac for newest-first)
+result=$(tmux capture-pane -pJ -S-$N 2>/dev/null | \
+  grep -oE 'https?://[^[:space:]>"'\'')]+|localhost:[0-9]+|[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+(:[0-9]+)?' | \
+  awk '!s[$0]++' | \
+  fzf --tac --no-sort --height=40% --reverse --expect=enter,space --header='↵cp ␣open' --color=hl:196) || exit 0
 
-  # Single capture, single grep - fast
-  items=$(tmux capture-pane -p -J -S "-$LINES" 2>/dev/null | \
-    grep -oE '(https?|ftp)://[^[:space:]]+|localhost:[0-9]+|([0-9]{1,3}\.){3}[0-9]{1,3}(:[0-9]+)?' | \
-    sed 's/[)>,.";"'\''":]*$//' | \
-    awk '!x[$0]++' | \
-    tac) || true
+# Parse result
+key=${result%%$'\n'*}
+item=${result##*$'\n'}
+[[ -z "$item" ]] && exit 0
 
-  [ -z "$items" ] && { tmux display-message "Nothing found"; exit 0; }
-
-  result=$(printf '%s\n' "$items" | \
-    fzf --height=40% --reverse \
-        --header='↵ copy │ ␣ open' \
-        --expect=enter,space \
-        --color='hl:196') || exit 0
-
-  key=$(head -1 <<< "$result")
-  item=$(tail -1 <<< "$result")
-  [ -z "$item" ] && exit 0
-
-  case "$key" in
-    space)
-      if [[ "$item" =~ ^(localhost|[0-9]+\.) ]]; then
-        open "http://$item" 2>/dev/null || xdg-open "http://$item" 2>/dev/null
-      else
-        open "$item" 2>/dev/null || xdg-open "$item" 2>/dev/null
-      fi
-      tmux display-message "◆ $item"
-      ;;
-    *)
-      printf '%s' "$item" | $CLIPBOARD && tmux display-message "✓ $item"
-      ;;
-  esac
-}
-
-main
+# Action
+case "$key" in
+  space)
+    [[ "$item" =~ ^https?: ]] || item="http://$item"
+    open "$item" 2>/dev/null || xdg-open "$item" 2>/dev/null
+    ;;
+  *) printf '%s' "$item" | $CLIP && tmux display-message "✓ $item" ;;
+esac
