@@ -1,7 +1,7 @@
 #!/bin/bash
 
-# tmux-link-grab - elegant URL/IP seeking for tmux
-# Hit prefix+s, numbers appear on URLs/IPs, type number, copy it
+# tmux-link-grab - elegant URL/IP/path seeking for tmux
+# Hit prefix+s, fzf list appears, Enter to copy, Space to open
 # License: GNU GPL v3
 
 set -euo pipefail
@@ -10,7 +10,7 @@ set -euo pipefail
 # CONFIGURATION
 # ============================================================================
 
-SCROLLBACK_LINES=100
+SCROLLBACK_LINES=${TMUX_LINK_GRAB_LINES:-500}
 
 # Detect clipboard command based on OS
 detect_clipboard() {
@@ -32,7 +32,7 @@ detect_clipboard() {
 check_dependencies() {
   local missing=()
 
-  for cmd in tmux grep fzf; do
+  for cmd in tmux fzf; do
     if ! command -v "$cmd" &>/dev/null; then
       missing+=("$cmd")
     fi
@@ -51,57 +51,78 @@ check_dependencies() {
 }
 
 # ============================================================================
+# EXTRACTION PATTERNS
+# ============================================================================
+
+extract_items() {
+  local content="$1"
+
+  # URLs (http/https/ftp) - clean trailing punctuation
+  echo "$content" | grep -oE '(https?|ftp)://[^ ]+' | sed 's/[)>,."'\''";:]+$//' | sed 's/[)>,."'\''";:]$//'
+
+  # IPs with optional port
+  echo "$content" | grep -oE '([0-9]{1,3}\.){3}[0-9]{1,3}(:[0-9]+)?'
+
+  # localhost with port
+  echo "$content" | grep -oE 'localhost:[0-9]+'
+
+  # File paths (absolute and ~/)
+  echo "$content" | grep -oE '(~|/)[a-zA-Z0-9_./-]+\.[a-zA-Z0-9]+' | grep -v '^/[0-9]'
+
+  # Git commit hashes (7-40 hex chars, standalone)
+  echo "$content" | grep -oE '\b[0-9a-f]{7,40}\b' | grep -v '[g-z]'
+}
+
+# ============================================================================
 # MAIN LOGIC
 # ============================================================================
 
 main() {
-  local window="${1:-$(tmux display-message -p '#{window_id}')}"
-
   # Check all dependencies exist
   if ! check_dependencies; then
     tmux display-message "tmux-link-grab: Missing dependencies" 2>/dev/null || exit 1
   fi
 
-  # Extract URLs and IPs from ALL PANES in current window
-  # -J joins wrapped lines (fixes URLs broken by line-wrap)
-  # Pattern matches:
-  #   - https://example.com
-  #   - http://example.com
-  #   - ftp://example.com
-  #   - 192.168.1.1
+  # Capture from ALL panes in current window
+  local content=""
+  local panes
+  panes=$(tmux list-panes -F '#{pane_id}')
+
+  for pane in $panes; do
+    content+=$(tmux capture-pane -p -J -S "-${SCROLLBACK_LINES}" -t "$pane" 2>/dev/null || true)
+    content+=$'\n'
+  done
+
+  # Extract all item types
   local items
-  # Extract URLs/IPs, dedupe while preserving order, newest first (so Enter = most recent)
-  items=$(tmux capture-pane -p -J -S "-${SCROLLBACK_LINES}" -t "$window" 2>/dev/null | \
-    grep -oE '(https?|ftp)://[^ ]+|([0-9]{1,3}\.){3}[0-9]{1,3}' | \
-    awk '!seen[$0]++' | \
-    tac)
+  items=$(extract_items "$content" | awk '!seen[$0]++' | tac)
 
   if [ -z "$items" ]; then
-    tmux display-message "tmux-link-grab: No URLs or IPs found" 2>/dev/null || true
+    tmux display-message "tmux-link-grab: Nothing found" 2>/dev/null || true
     return 1
   fi
 
-  # Let user pick from numbered list using fzf
-  # Enter = copy, Space = open in browser
+  # Count items for header
+  local count
+  count=$(echo "$items" | wc -l | tr -d ' ')
+
+  # Let user pick using fzf
   local result
-  result=$(echo "$items" | nl -w1 -s'. ' | \
+  result=$(echo "$items" | \
     fzf --no-preview \
       --height 50% \
-      --header '↵ copy │ ␣ open' \
+      --header "↵ copy │ ␣ open │ ${count} items" \
       --expect 'enter,space' \
       --bind 'esc:abort' \
-      --color 'hl:196')
+      --color 'hl:196,hl+:196')
 
   if [ -z "$result" ]; then
     return 0
   fi
 
-  # Parse fzf output: first line is the key pressed, second is the selection
+  # Parse fzf output
   local key=$(echo "$result" | head -1)
-  local choice=$(echo "$result" | tail -1)
-
-  # Extract the item by removing leading "N. "
-  local item="${choice#[0-9]*. }"
+  local item=$(echo "$result" | tail -1)
 
   if [ -z "$item" ]; then
     return 0
@@ -109,14 +130,24 @@ main() {
 
   case "$key" in
     space)
-      # Open in browser
-      if [[ "$item" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+      # Open in browser/finder
+      if [[ "$item" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+ ]]; then
         open "http://$item" 2>/dev/null || xdg-open "http://$item" 2>/dev/null
-        tmux display-message "◆ Opening: http://$item"
+      elif [[ "$item" =~ ^localhost: ]]; then
+        open "http://$item" 2>/dev/null || xdg-open "http://$item" 2>/dev/null
+      elif [[ "$item" =~ ^[~/] ]]; then
+        # Expand ~ and open in finder/file manager
+        local expanded="${item/#\~/$HOME}"
+        if [ -e "$expanded" ]; then
+          open "$expanded" 2>/dev/null || xdg-open "$expanded" 2>/dev/null
+        else
+          tmux display-message "✗ Not found: $item"
+          return 1
+        fi
       else
         open "$item" 2>/dev/null || xdg-open "$item" 2>/dev/null
-        tmux display-message "◆ Opening: $item"
       fi
+      tmux display-message "◆ Opening: $item"
       ;;
     *)
       # Default (enter): copy to clipboard
