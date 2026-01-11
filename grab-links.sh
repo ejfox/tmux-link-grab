@@ -3,6 +3,15 @@
 
 set -euo pipefail
 
+# Cleanup temporary files on exit
+TMP_FILE=""
+cleanup() {
+    if [[ -n "$TMP_FILE" ]] && [[ -f "$TMP_FILE" ]]; then
+        rm -f "$TMP_FILE"
+    fi
+}
+trap cleanup EXIT INT TERM
+
 # ============================================================================
 # Configuration
 # ============================================================================
@@ -18,6 +27,13 @@ get_tmux_option() {
 
 SCROLLBACK_LINES=$(get_tmux_option "@link-grab-lines" "200")
 BROWSER=$(get_tmux_option "@link-grab-browser" "${BROWSER:-xdg-open}")
+
+# URL regex patterns
+REGEX_HTTP='https?://[a-zA-Z0-9./?#:@!$&'\''()*+,;=_~%-]+'
+REGEX_LOCALHOST='https?://localhost(:[0-9]+)?(/[a-zA-Z0-9./?#:@!$&'\''()*+,;=_~%-]*)?'
+REGEX_FTP='ftp://[a-zA-Z0-9./?#:@!$&'\''()*+,;=_~%-]+'
+REGEX_IPV4='(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)(:[0-9]+)?'
+REGEX_LOCALHOST_PORT='localhost:[0-9]+'
 
 # ============================================================================
 # Dependency Checks
@@ -47,14 +63,11 @@ copy_to_clipboard() {
     elif command -v wl-copy &> /dev/null; then
         # Linux Wayland
         echo -n "$text" | wl-copy
-    elif command -v tmux &> /dev/null; then
-        # Fallback to tmux buffer
+    else
+        # Fallback to tmux buffer (always available in tmux context)
         tmux set-buffer "$text"
         tmux display-message "✓ copied to tmux buffer (no system clipboard tool found)"
         return 0
-    else
-        tmux display-message "Error: no clipboard tool found (pbcopy/xclip/wl-copy)"
-        return 1
     fi
     
     tmux display-message "✓ copied to clipboard"
@@ -102,11 +115,7 @@ main() {
     # Extract URLs and IPs with improved regex patterns
     local urls
     urls=$(echo "$content" | grep -oE \
-        'https?://[a-zA-Z0-9./?#:@!$&'\''()*+,;=_~%-]+|'\
-'https?://localhost(:[0-9]+)?(/[a-zA-Z0-9./?#:@!$&'\''()*+,;=_~%-]*)?|'\
-'ftp://[a-zA-Z0-9./?#:@!$&'\''()*+,;=_~%-]+|'\
-'[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}(:[0-9]+)?|'\
-'localhost:[0-9]+' \
+        "${REGEX_HTTP}|${REGEX_LOCALHOST}|${REGEX_FTP}|${REGEX_IPV4}|${REGEX_LOCALHOST_PORT}" \
         || echo "")
     
     if [[ -z "$urls" ]]; then
@@ -117,21 +126,23 @@ main() {
     # Remove duplicates and reverse (most recent first)
     urls=$(echo "$urls" | awk '!seen[$0]++' | tac)
     
+    # Create secure temporary file for space key handling
+    TMP_FILE=$(mktemp)
+    
     # Present URLs with fzf
     local selected
     selected=$(echo "$urls" | fzf \
         --height=80% \
         --reverse \
         --header='↵ copy | Space open | Esc cancel' \
-        --bind 'space:execute(echo {} > /tmp/tmux-link-grab-open)+abort' \
+        --bind "space:execute(echo {} > $TMP_FILE)+abort" \
         --expect=space \
         || echo "")
     
     # Handle selection
-    if [[ -f /tmp/tmux-link-grab-open ]]; then
+    if [[ -f "$TMP_FILE" ]] && [[ -s "$TMP_FILE" ]]; then
         local url
-        url=$(cat /tmp/tmux-link-grab-open)
-        rm -f /tmp/tmux-link-grab-open
+        url=$(cat "$TMP_FILE")
         if [[ -n "$url" ]]; then
             open_in_browser "$url"
         fi
