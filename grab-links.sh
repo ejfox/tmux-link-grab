@@ -133,9 +133,10 @@ if [ -z "$URLS" ]; then
     exit 0
 fi
 
-SELECTED=$(echo "$URLS" | fzf --no-info --no-sort --disabled --reverse \
-    --bind 'j:down,k:up,space:accept' \
-    --color 'pointer:red')
+SELECTED=$(echo "$URLS" | fzf --no-info --no-sort --reverse \
+    --bind 'j:down,k:up,space:accept,enter:accept' \
+    --color 'pointer:red' \
+    --header '↵/space: select · type to filter')
 
 [ -z "$SELECTED" ] && exit 0
 
