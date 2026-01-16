@@ -24,7 +24,7 @@ HISTORY_MAX=$(get_opt "@link-grab-history-max" "100")
 # Core functions
 # ============================================================================
 
-URL_PATTERN='https?://[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}[^[:space:]>"'\'')<]*|https?://localhost(:[0-9]+)?[^[:space:]>"'\'')<]*'
+URL_PATTERN='https?://[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}[^[:space:]>"'\'')<`]*|https?://localhost(:[0-9]+)?[^[:space:]>"'\'')<`]*'
 
 get_pane_label() {
     tmux display-message -t "$1" -p '#{pane_current_command}' 2>/dev/null | head -c 12
