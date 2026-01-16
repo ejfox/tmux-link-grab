@@ -5,6 +5,23 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.0.0] - 2026-01-16
+
+### Added
+- **Proper tmux options** - configure via `set -g @link-grab-*` in tmux.conf
+- **Auto keybinding** - plugin.tmux sets up `prefix + s` automatically
+- **Buffer action** - new `@link-grab-action "buffer"` saves to tmux paste buffer
+- **Status feedback** - shows "Opened: domain.com" / "Copied: url..." in status line
+- Respects user's `copy-command` setting
+
+### Changed
+- Config moved from script variables to tmux options
+- `@link-grab-key` lets you change the keybinding
+- plugin.tmux now properly initializes the plugin
+
+### Breaking
+- Remove any manual script edits; use tmux options instead
+
 ## [2.2.0] - 2026-01-16
 
 ### Added
