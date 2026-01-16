@@ -4,7 +4,9 @@ Fast URL seeking for tmux with fzf. `prefix + s` → pick URL → open in browse
 
 ## Features
 
-- **Flexible scope** - search current pane, window, or entire session (current pane always first)
+- **Flexible scope** - search current pane, window, session, or history
+- **Pane labels** - see which pane each URL came from (e.g. `[nvim] https://...`)
+- **Persistent history** - access previously opened URLs even after scrollback is gone
 - **fzf interface** - j/k navigation, fuzzy search
 - **Deduped & sorted** - most recent URLs first, no duplicates
 
@@ -35,7 +37,7 @@ bind-key s display-popup -E "~/.tmux/plugins/tmux-link-grab/grab-links.sh"
 Edit the top of `grab-links.sh`:
 
 ```bash
-# Scope: "pane", "window", or "session" (current pane always first)
+# Scope: "pane", "window", "session", or "history"
 SCOPE="window"
 
 # How many lines of scrollback to search per pane
@@ -43,6 +45,13 @@ SCROLLBACK_LINES=200
 
 # Action: "open" or "copy"
 ACTION="open"
+
+# Show pane labels in window/session mode
+SHOW_LABELS=true
+
+# History file (set to "" to disable)
+HISTORY_FILE="$HOME/.tmux-link-history"
+HISTORY_MAX=100
 ```
 
 ## Keys
