@@ -5,6 +5,22 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.0.0] - 2026-01-16
+
+### Added
+- **Window scope** - search URLs across all panes in current window (current pane URLs first)
+- `SCOPE` config option: `"window"` (default) or `"pane"`
+- `ACTION` config option: `"open"` (default) or `"copy"`
+
+### Changed
+- Simplified config to 3 options at top of script
+- Default scope is now `window` instead of single pane
+- Cleaner implementation with better URL deduplication
+
+### Removed
+- Flash confirmation (unnecessary complexity)
+- Environment variable config (now edit script directly)
+
 ## [1.1.0] - 2025-12-09
 
 ### Added
