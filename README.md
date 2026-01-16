@@ -4,7 +4,7 @@ Fast URL seeking for tmux with fzf. `prefix + s` → pick URL → open in browse
 
 ## Features
 
-- **Window or pane scope** - search all panes in window (current pane first) or just active pane
+- **Flexible scope** - search current pane, window, or entire session (current pane always first)
 - **fzf interface** - j/k navigation, fuzzy search
 - **Deduped & sorted** - most recent URLs first, no duplicates
 
@@ -35,7 +35,7 @@ bind-key s display-popup -E "~/.tmux/plugins/tmux-link-grab/grab-links.sh"
 Edit the top of `grab-links.sh`:
 
 ```bash
-# Scope: "pane" (current pane only) or "window" (all panes, current first)
+# Scope: "pane", "window", or "session" (current pane always first)
 SCOPE="window"
 
 # How many lines of scrollback to search per pane

@@ -8,7 +8,7 @@
 # CONFIG
 # ============================================================================
 
-# Scope: "pane" (current pane only) or "window" (all panes, current first)
+# Scope: "pane", "window", or "session" (current pane always first)
 SCOPE="window"
 
 # How many lines of scrollback to search per pane
@@ -25,17 +25,29 @@ extract_urls() {
     tmux capture-pane -p -t "$1" -S-"$SCROLLBACK_LINES" 2>/dev/null | grep -oE "$URL_PATTERN"
 }
 
-if [ "$SCOPE" = "window" ]; then
-    CURRENT_PANE=$(tmux display-message -p '#{pane_id}')
-    {
-        extract_urls "$CURRENT_PANE" | awk '!seen[$0]++' | tac
-        for pane in $(tmux list-panes -F '#{pane_id}'); do
-            [ "$pane" != "$CURRENT_PANE" ] && extract_urls "$pane" | awk '!seen[$0]++' | tac
-        done
-    } | grep -v '^$' | awk '!seen[$0]++'
-else
-    tmux capture-pane -pJ -S-"$SCROLLBACK_LINES" 2>/dev/null | grep -oE "$URL_PATTERN" | awk '!seen[$0]++' | tac
-fi | fzf --no-info --no-sort --disabled --reverse --bind 'j:down,k:up,space:accept' --color 'pointer:red' | {
+CURRENT_PANE=$(tmux display-message -p '#{pane_id}')
+
+case "$SCOPE" in
+    session)
+        {
+            extract_urls "$CURRENT_PANE" | awk '!seen[$0]++' | tac
+            for pane in $(tmux list-panes -a -F '#{pane_id}'); do
+                [ "$pane" != "$CURRENT_PANE" ] && extract_urls "$pane" | awk '!seen[$0]++' | tac
+            done
+        } | grep -v '^$' | awk '!seen[$0]++'
+        ;;
+    window)
+        {
+            extract_urls "$CURRENT_PANE" | awk '!seen[$0]++' | tac
+            for pane in $(tmux list-panes -F '#{pane_id}'); do
+                [ "$pane" != "$CURRENT_PANE" ] && extract_urls "$pane" | awk '!seen[$0]++' | tac
+            done
+        } | grep -v '^$' | awk '!seen[$0]++'
+        ;;
+    *)
+        tmux capture-pane -pJ -S-"$SCROLLBACK_LINES" 2>/dev/null | grep -oE "$URL_PATTERN" | awk '!seen[$0]++' | tac
+        ;;
+esac | fzf --no-info --no-sort --disabled --reverse --bind 'j:down,k:up,space:accept' --color 'pointer:red' | {
     read -r URL
     [ -n "$URL" ] && { [ "$ACTION" = "copy" ] && echo -n "$URL" | pbcopy || open "$URL"; }
 }
