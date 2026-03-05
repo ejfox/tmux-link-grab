@@ -26,6 +26,17 @@ HISTORY_MAX=$(get_opt "@link-grab-history-max" "100")
 
 URL_PATTERN='https?://[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}[^[:space:]>"'\'')<`]*|https?://localhost(:[0-9]+)?[^[:space:]>"'\'')<`]*'
 
+# Portable reverse-lines: tac (GNU) → tail -r (macOS) → awk fallback
+reverse_lines() {
+    if command -v tac &>/dev/null; then
+        tac
+    elif tail -r /dev/null 2>/dev/null; then
+        tail -r
+    else
+        awk '{lines[NR]=$0} END {for(i=NR;i>=1;i--) print lines[i]}'
+    fi
+}
+
 get_pane_label() {
     tmux display-message -t "$1" -p '#{pane_current_command}' 2>/dev/null | head -c 12
 }
@@ -50,7 +61,7 @@ save_history() {
 
 show_history() {
     [ -z "$HISTORY_FILE" ] || [ ! -f "$HISTORY_FILE" ] && return
-    tac "$HISTORY_FILE" | awk '!seen[$2]++ {print $2}'
+    reverse_lines < "$HISTORY_FILE" | awk '!seen[$2]++ {print $2}'
 }
 
 copy_url() {
@@ -102,22 +113,22 @@ gather_urls() {
             ;;
         session)
             {
-                extract_urls "$CURRENT_PANE" "" | awk '!seen[$0]++' | tac
+                extract_urls "$CURRENT_PANE" "" | awk '!seen[$0]++' | reverse_lines
                 for pane in $(tmux list-panes -a -F '#{pane_id}'); do
-                    [ "$pane" != "$CURRENT_PANE" ] && extract_urls "$pane" "$(get_pane_label "$pane")" | awk '!seen[$0]++' | tac
+                    [ "$pane" != "$CURRENT_PANE" ] && extract_urls "$pane" "$(get_pane_label "$pane")" | awk '!seen[$0]++' | reverse_lines
                 done
             } | grep -v '^$' | awk '!seen[$0]++'
             ;;
         window)
             {
-                extract_urls "$CURRENT_PANE" "" | awk '!seen[$0]++' | tac
+                extract_urls "$CURRENT_PANE" "" | awk '!seen[$0]++' | reverse_lines
                 for pane in $(tmux list-panes -F '#{pane_id}'); do
-                    [ "$pane" != "$CURRENT_PANE" ] && extract_urls "$pane" "$(get_pane_label "$pane")" | awk '!seen[$0]++' | tac
+                    [ "$pane" != "$CURRENT_PANE" ] && extract_urls "$pane" "$(get_pane_label "$pane")" | awk '!seen[$0]++' | reverse_lines
                 done
             } | grep -v '^$' | awk '!seen[$0]++'
             ;;
         *)
-            tmux capture-pane -pJ -S-"$SCROLLBACK" 2>/dev/null | grep -oE "$URL_PATTERN" | awk '!seen[$0]++' | tac
+            tmux capture-pane -pJ -S-"$SCROLLBACK" 2>/dev/null | grep -oE "$URL_PATTERN" | awk '!seen[$0]++' | reverse_lines
             ;;
     esac
 }
