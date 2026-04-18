@@ -3,13 +3,18 @@
 # tmux-link-grab - URL seeking for tmux
 # ============================================================================
 
+# -e is deliberately omitted: grep -oE returns 1 on "no matches" which is
+# a normal case (no URLs on screen), not an error worth aborting on.
+set -uo pipefail
+
 # ============================================================================
 # Read tmux options (with defaults)
 # ============================================================================
 
 get_opt() {
     local opt="$1" default="$2"
-    local val=$(tmux show-option -gqv "$opt")
+    local val
+    val=$(tmux show-option -gqv "$opt")
     echo "${val:-$default}"
 }
 
@@ -43,7 +48,8 @@ get_pane_label() {
 
 extract_urls() {
     local pane="$1" label="$2"
-    local content=$(tmux capture-pane -p -t "$pane" -S-"$SCROLLBACK" 2>/dev/null)
+    local content
+    content=$(tmux capture-pane -pJ -t "$pane" -S-"$SCROLLBACK" 2>/dev/null)
     if [ -n "$label" ] && [ "$SHOW_LABELS" = "true" ]; then
         echo "$content" | grep -oE "$URL_PATTERN" | while read -r url; do echo "[$label] $url"; done
     else
@@ -67,7 +73,8 @@ show_history() {
 copy_url() {
     local url="$1"
     # Check for user's copy-command first
-    local copy_cmd=$(tmux show-option -gqv "copy-command")
+    local copy_cmd
+    copy_cmd=$(tmux show-option -gqv "copy-command")
     if [ -n "$copy_cmd" ]; then
         echo -n "$url" | eval "$copy_cmd"
     elif command -v pbcopy &>/dev/null; then
@@ -96,7 +103,8 @@ open_url() {
         return 1
     fi
     # Extract domain for display
-    local domain=$(echo "$url" | sed -E 's|https?://([^/]+).*|\1|' | head -c 40)
+    local domain
+    domain=$(echo "$url" | sed -E 's|https?://([^/]+).*|\1|' | head -c 40)
     tmux display-message "Opened: $domain"
 }
 
@@ -151,8 +159,8 @@ SELECTED=$(echo "$URLS" | fzf --no-info --no-sort --reverse \
 
 [ -z "$SELECTED" ] && exit 0
 
-# Strip label if present
-URL=$(echo "$SELECTED" | sed 's/^\[[^]]*\] //')
+# Strip label if present (e.g. "[nvim] https://…" → "https://…")
+URL="${SELECTED#\[*\] }"
 
 # Save to history
 [ -n "$HISTORY_FILE" ] && save_history "$URL"
