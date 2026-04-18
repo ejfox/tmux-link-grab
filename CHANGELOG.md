@@ -5,6 +5,31 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.1.0] - 2026-04-18
+
+### Added
+- Test suite at `tests/run.sh` — 28 cases covering URL regex happy
+  paths, localhost special case, terminator characters, multi-URL
+  lines, non-matches (ftp, bare IPs, file://, mailto), plus
+  `reverse_lines` portability and the label-strip parameter
+  expansion used by the main block.
+- `.github/workflows/ci.yml` — runs shellcheck, `bash -n`, and the
+  full test suite on every push and pull request.
+- Main block now guarded by `[[ BASH_SOURCE == $0 ]]` so tests (and
+  ad-hoc tooling) can source `grab-links.sh` to call its functions
+  without triggering the fzf popup or tmux side effects.
+
+### Fixed
+- `capture-pane` calls in `window`/`session` scopes now pass `-J`
+  (join wrapped lines), matching the pane-scope fallback. URLs that
+  wrap pane-width are no longer split in window/session mode.
+- `set -uo pipefail` at the top of `grab-links.sh` catches unset
+  variables. `-e` is intentionally omitted: `grep -oE` returns 1 on
+  zero matches, a normal "no URLs on screen" case.
+- All 5 shellcheck warnings resolved (SC2155 × 5: separate `local`
+  declaration from assignment; SC2001 × 1: replace a sed invocation
+  with parameter expansion for the label strip).
+
 ## [3.0.0] - 2026-01-16
 
 ### Added
