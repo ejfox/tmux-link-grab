@@ -112,7 +112,10 @@ open_url() {
 # Gather URLs based on scope
 # ============================================================================
 
-CURRENT_PANE=$(tmux display-message -p '#{pane_id}')
+# CURRENT_PANE is read by gather_urls in session/window scopes.
+# Tests may override it before calling; defaults to empty when sourced
+# outside a tmux context.
+: "${CURRENT_PANE:=}"
 
 gather_urls() {
     case "$SCOPE" in
@@ -145,29 +148,35 @@ gather_urls() {
 # Main
 # ============================================================================
 
-URLS=$(gather_urls)
+# Only run main flow when executed directly; when sourced (e.g. from tests),
+# the functions and constants above are available without side effects.
+if [ "${BASH_SOURCE[0]}" = "${0}" ]; then
+    CURRENT_PANE=$(tmux display-message -p '#{pane_id}')
 
-if [ -z "$URLS" ]; then
-    tmux display-message "No URLs found"
-    exit 0
+    URLS=$(gather_urls)
+
+    if [ -z "$URLS" ]; then
+        tmux display-message "No URLs found"
+        exit 0
+    fi
+
+    SELECTED=$(echo "$URLS" | fzf --no-info --no-sort --reverse \
+        --bind 'j:down,k:up,space:accept,enter:accept' \
+        --color 'pointer:red' \
+        --header '↵/space: select · type to filter')
+
+    [ -z "$SELECTED" ] && exit 0
+
+    # Strip label if present (e.g. "[nvim] https://…" → "https://…")
+    URL="${SELECTED#\[*\] }"
+
+    # Save to history
+    [ -n "$HISTORY_FILE" ] && save_history "$URL"
+
+    # Execute action
+    case "$ACTION" in
+        copy) copy_url "$URL" ;;
+        buffer) tmux set-buffer "$URL" && tmux display-message "Saved to tmux buffer" ;;
+        *) open_url "$URL" ;;
+    esac
 fi
-
-SELECTED=$(echo "$URLS" | fzf --no-info --no-sort --reverse \
-    --bind 'j:down,k:up,space:accept,enter:accept' \
-    --color 'pointer:red' \
-    --header '↵/space: select · type to filter')
-
-[ -z "$SELECTED" ] && exit 0
-
-# Strip label if present (e.g. "[nvim] https://…" → "https://…")
-URL="${SELECTED#\[*\] }"
-
-# Save to history
-[ -n "$HISTORY_FILE" ] && save_history "$URL"
-
-# Execute action
-case "$ACTION" in
-    copy) copy_url "$URL" ;;
-    buffer) tmux set-buffer "$URL" && tmux display-message "Saved to tmux buffer" ;;
-    *) open_url "$URL" ;;
-esac
