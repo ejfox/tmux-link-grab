@@ -2,6 +2,8 @@
 
 Fast URL seeking for tmux with fzf. `prefix + s` → pick URL → open in browser.
 
+![demo](demo.gif)
+
 ## Features
 
 - **Flexible scope** - search current pane, window, session, or history
