@@ -160,9 +160,13 @@ if [ "${BASH_SOURCE[0]}" = "${0}" ]; then
         exit 0
     fi
 
+    # Colors use terminal ANSI palette (-1 = default, 0-15 = ANSI indexes)
+    # so the popup follows whatever theme the terminal is currently using —
+    # no system-appearance detection or config sourcing required.
     SELECTED=$(echo "$URLS" | fzf --no-info --no-sort --reverse \
         --bind 'j:down,k:up,space:accept,enter:accept' \
-        --color 'pointer:red' \
+        --color='fg:-1,bg:-1,hl:1,fg+:-1,bg+:8,hl+:1,gutter:-1' \
+        --color='pointer:1,marker:1,prompt:1,spinner:1,info:8,header:8,border:8' \
         --header '↵/space: select · type to filter')
 
     [ -z "$SELECTED" ] && exit 0
