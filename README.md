@@ -11,6 +11,9 @@ Fast URL seeking for tmux with fzf. `prefix + s` → pick URL → open in browse
 - **Persistent history** - access previously opened URLs even after scrollback is gone
 - **Proper tmux citizen** - configure via tmux options, respects your copy-command
 - **fzf interface** - j/k navigation, fuzzy search
+- **Smart detection** - trims trailing punctuation and unbalanced parens,
+  finds IPs, `localhost:3000`, `git@` remotes, and bare domains like
+  `github.com/x` (common TLDs only, so `README.md` isn't a link)
 
 ## Install
 

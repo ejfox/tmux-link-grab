@@ -5,6 +5,44 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.2.0] - 2026-10-04
+
+### Changed
+- URL detection is now two-stage: a greedy candidate grep, then a
+  `clean_urls` awk pass modeled on GFM's extended-autolink rules.
+
+### Fixed
+- Trailing punctuation no longer captured (`example.com.`, `a.com,`,
+  `x;`, `bold**`, `localhost:3000.`).
+- Balanced parens/brackets: `wiki/Foo_(bar)` is kept whole, while a
+  wrapping `(…)`, `[…]` or `{…}` is trimmed.
+- TUI box-drawing borders and smart quotes are stripped from URL edges.
+
+### Added
+- IPv4 and `[IPv6]` hosts (`http://127.0.0.1:5173`, `http://[::1]:3000`),
+  uppercase schemes, and `user:pw@` userinfo.
+- Bare domains without a scheme (`github.com/x`, `docs.python.org/3`),
+  opened as `https://`. Only TLDs on a curated list count, drawn from
+  W3Techs' top ~100 by usage plus dev favourites. TLDs that are also
+  file extensions or English words (`md py rs sh ai app id dev info
+  top link email cloud …`) need a lowercase host and a `/path`, so
+  `claude.ai/code` matches but `README.md`, `Docker.app/Contents`,
+  `user.email` and `rect.top` don't. Known platform hosts
+  (`*.vercel.app`, `*.pages.dev`, `fly.dev`, `dev.to`, …) count bare.
+- Code-shaped text is rejected: method calls (`arr.at(-1)`), email local
+  parts (`first.me@gmail.com`), mixed-case TLDs (`import.meta.env.DEV`,
+  `System.Net`) and reverse-DNS IDs (`com.example.app`).
+- Bare hosts are found inside backticks, `**bold**` and table pipes.
+- Bare `localhost:PORT` and `*.local` hosts, opened as `http://`.
+- Single-label hosts with an explicit scheme (`http://nas:5000`) and
+  IDN hosts (`https://müller.de`).
+- Git remotes opened as `https://host/owner/repo`: `git@host:owner/repo.git`,
+  `ssh://git@host[:port]/…`, `git+ssh://…`, and git push's
+  `To github.com:owner/repo.git`.
+- Test suite grows from 28 to 203 cases, mostly realistic terminal output:
+  git/npm/vite/uvicorn banners, go.mod, docker refs, markdown/HTML/JSON,
+  table pipes, and nvim code lines that must not match.
+
 ## [3.1.1] - 2026-04-24
 
 ### Fixed
