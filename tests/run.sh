@@ -133,6 +133,39 @@ assert_match '{https://example.com/brace}'                    'https://example.c
 assert_match '│https://example.com/tui│'             'https://example.com/tui'
 assert_match '“https://example.com/smart”'           'https://example.com/smart'
 
+# --- Unicode punctuation glued to a URL (smart punctuation, CJK) ---
+assert_match 'https://ejfox.com—it rules'             'https://ejfox.com'
+assert_match 'https://ejfox.com–dash'                 'https://ejfox.com'
+# shellcheck disable=SC1112  # curly apostrophe is the test input
+assert_match 'https://ejfox.com’s blog'               'https://ejfox.com'
+assert_match 'https://ejfox.com…'                     'https://ejfox.com'
+assert_match 'https://ejfox.com”.'                    'https://ejfox.com'
+assert_match 'https://ejfox.com/»'                    'https://ejfox.com/'
+assert_match 'https://ejfox.com/。'                   'https://ejfox.com/'
+assert_match 'https://ejfox.com/，next'               'https://ejfox.com/'
+assert_match 'check out ejfox.com—it rules'           'https://ejfox.com'
+# shellcheck disable=SC1112  # curly apostrophe is the test input
+assert_match 'check out ejfox.com’s blog'             'https://ejfox.com'
+assert_match '“ejfox.com”.'                           'https://ejfox.com'
+assert_match '（ejfox.com/a）'                        'https://ejfox.com/a'
+assert_match 'https://ja.wikipedia.org/wiki/東京'     'https://ja.wikipedia.org/wiki/東京'
+
+# --- plain punctuation after a bare host ---
+assert_match 'check out ejfox.com, it rules'          'https://ejfox.com'
+assert_match 'check out ejfox.com. Then'              'https://ejfox.com'
+assert_match 'check out ejfox.com! wow'               'https://ejfox.com'
+assert_match 'check out ejfox.com? maybe'             'https://ejfox.com'
+assert_match 'check out ejfox.com: nice'              'https://ejfox.com'
+assert_match "check out ejfox.com's blog"             'https://ejfox.com'
+assert_match '(ejfox.com).'                           'https://ejfox.com'
+assert_match 'ejfox.com!!!'                           'https://ejfox.com'
+assert_match 'ejfox.com...'                           'https://ejfox.com'
+assert_match 'https://ejfox.com/a!).'                 'https://ejfox.com/a'
+
+# --- comma-glued URLs split ---
+assert_count 'https://ejfox.com/a,https://b.com'      2
+assert_count 'ejfox.com,https://b.com'                2
+
 # --- hosts ---
 assert_match 'http://192.168.1.10:8080/admin ip'      'http://192.168.1.10:8080/admin'
 assert_match 'vite http://127.0.0.1:5173/'            'http://127.0.0.1:5173/'

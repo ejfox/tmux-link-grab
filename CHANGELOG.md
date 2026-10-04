@@ -5,6 +5,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+- Unicode punctuation glued to a URL no longer becomes part of it:
+  `https://ejfox.com—great`, `https://ejfox.com’s`, `…`, `»`, CJK
+  `。，` and friends now end the URL. Smart quotes and full-width
+  brackets also count as delimiters before bare hosts, so
+  `“ejfox.com”` is found.
+- Comma-glued URLs (`https://a.com,https://b.com`) are split in two.
+
+### Changed
+- TUI border / smart-quote trimming folded into a single `split_punct`
+  pre-pass. Test suite at 228 cases.
+
 ## [3.2.0] - 2026-10-04
 
 ### Changed

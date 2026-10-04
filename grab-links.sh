@@ -70,7 +70,6 @@ web.dev bun.sh deno.land dev.to"
 #  - strip trailing punctuation: . , ; : ! ? * _ ~ ' |
 #  - strip a trailing ) ] } only when it's unbalanced, so
 #    wiki/Foo_(bar) survives but (see https://x.com) loses its paren
-#  - strip trailing box-drawing / smart-quote decorations from TUIs
 #  - normalize git remotes (git@host:a/b.git, ssh://git@host/a/b.git,
 #    host:a/b.git) → https://host/a/b; bare hosts get https:// (http://
 #    for localhost and *.local dev servers)
@@ -81,7 +80,6 @@ web.dev bun.sh deno.land dev.to"
 #    must not look like code: foo.at( calls, a.me@ emails,
 #    import.meta.env.DEV / System.Net casing, com.example.app reverse-DNS
 clean_urls() {
-    # shellcheck disable=SC1112  # smart quotes in the deco list are intentional
     LC_ALL=C awk -v strong="${BARE_TLDS_STRONG//$'\n'/ }" \
         -v weak="${BARE_TLDS_WEAK//$'\n'/ }" \
         -v known="${BARE_KNOWN_HOSTS//$'\n'/ }" '
@@ -101,7 +99,6 @@ clean_urls() {
     BEGIN {
         punct = ".,;:!?*_~|'\''"
         open[")"] = "("; open["]"] = "["; open["}"] = "{"
-        ndeco = split("│ ┃ ║ ┆ ┊ ” ’ » … ▏ ▕", deco, " ")
         n = split(strong, t); for (i = 1; i <= n; i++) tld_strong[t[i]] = 1
         n = split(weak, t);   for (i = 1; i <= n; i++) tld_weak[t[i]] = 1
         nknown = split(known, kh)
@@ -118,10 +115,6 @@ clean_urls() {
                 u = substr(u, 1, length(u) - 1); changed = 1
             } else if (c in open && count(u, c) > count(u, open[c])) {
                 u = substr(u, 1, length(u) - 1); changed = 1
-            } else {
-                for (i = 1; i <= ndeco; i++) if (ends(u, deco[i])) {
-                    u = substr(u, 1, length(u) - length(deco[i])); changed = 1; break
-                }
             }
         } while (changed && length(u) > 0)
 
@@ -182,7 +175,21 @@ clean_urls() {
 
 # stdin (pane text) → one cleaned URL per line, in order of appearance
 find_urls() {
-    grep -oiE "$URL_PATTERN" | clean_urls
+    split_punct | grep -oiE "$URL_PATTERN" | clean_urls
+}
+
+# Turn Unicode punctuation and TUI borders into spaces before matching, so
+# they end a URL (https://ejfox.com—great, ejfox.com’s, “ejfox.com”,
+# 見て https://x.com/。) and also count as a delimiter before a bare host.
+# Also split comma-glued URLs: https://a.com,https://b.com. Byte-wise
+# (LC_ALL=C) so it behaves the same in any locale.
+split_punct() {
+    # shellcheck disable=SC1112  # the smart quotes are the point
+    LC_ALL=C awk '{
+        gsub(/—|–|‘|’|“|”|«|»|…|。|，|、|：|；|！|？|（|）|「|」|【|】|│|┃|║|┆|┊|▏|▕/, " ")
+        gsub(/,https:\/\//, " https://"); gsub(/,http:\/\//, " http://")
+        print
+    }'
 }
 
 # Portable reverse-lines: tac (GNU) → tail -r (macOS) → awk fallback
